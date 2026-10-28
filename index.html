@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Clasificador de Decisiones TRG</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: encabezado con avance + filtros sticky; lista de casos agrupada por área, cada caso con 4 botones de nivel */
+:root{
+  --bg:#FAEEE6; --surface:#FFFFFF; --ink:#3A1F29; --muted:#7A5C66; --line:#EAD9CF;
+  --wine:#532D3B; --onwine:#FAEEE6;
+  --n1:#7E8E3F; --n2:#B0912A; --n3:#B8622F; --n4:#8A3A4F;
+  --n1bg:#EEF1DF; --n2bg:#F6EDCF; --n3bg:#F6E1D2; --n4bg:#F2DCE2;
+  --display:"Playfair Display",Georgia,serif; --body:"DM Sans",system-ui,sans-serif; --mono:"DM Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1E1418; --surface:#2A1D22; --ink:#F3E6DE; --muted:#B89EA6; --line:#3D2A31;
+  --wine:#3A2029; --onwine:#F3E6DE;
+  --n1:#A9BA66; --n2:#D9BA55; --n3:#E08C57; --n4:#D47A90;
+  --n1bg:#2E3320; --n2bg:#3A321B; --n3bg:#3D2619; --n4bg:#3D1F28; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1E1418; --surface:#2A1D22; --ink:#F3E6DE; --muted:#B89EA6; --line:#3D2A31;
+  --wine:#3A2029; --onwine:#F3E6DE;
+  --n1:#A9BA66; --n2:#D9BA55; --n3:#E08C57; --n4:#D47A90;
+  --n1bg:#2E3320; --n2bg:#3A321B; --n3bg:#3D2619; --n4bg:#3D1F28; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 60px}
+h1{font-family:var(--display);font-size:clamp(28px,5vw,42px);line-height:1.1;margin:0 0 8px;color:var(--ink);text-wrap:balance}
+.lede{color:var(--muted);max-width:64ch;margin:0 0 20px}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:20px}
+.lg{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;border-top:4px solid var(--c);display:flex;flex-direction:column;gap:8px;min-width:0}
+.lg b{font-family:var(--body);color:var(--c);display:block;font-size:15px}
+.lg .def{font-size:13.5px;color:var(--ink)}
+.lg dl{margin:0;display:grid;gap:6px}
+.lg dt{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lg dd{margin:0;font-size:13px;color:var(--ink)}
+.lg ul{margin:2px 0 0;padding-left:16px}
+.lg li{margin:1px 0}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:10px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.prog{flex:1 1 220px;min-width:0}
+.prog .t{font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+.prog .t i{font-style:normal;color:var(--c)}
+.track{height:8px;background:var(--line);border-radius:4px;display:flex;overflow:hidden;margin-top:4px}
+.track div{height:100%}
+select,input[type=search],input[type=text],textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+.btn{font:inherit;font-weight:500;font-size:14px;border:1px solid var(--wine);background:var(--wine);color:var(--onwine);border-radius:6px;padding:7px 14px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.sm{font-size:13px;padding:5px 10px}
+.btn:focus-visible,.lv:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--n3);outline-offset:2px}
+.area{margin-top:28px}
+.area h2{font-family:var(--display);font-size:22px;margin:0 0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.area h2 small{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:400}
+.case{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--cl,var(--line));border-radius:6px;padding:10px 12px;margin-top:8px;display:grid;grid-template-columns:1fr auto;gap:8px 14px;align-items:center}
+.case .txt{min-width:0}
+.case .q{font-weight:500}
+.case .ctx{font-size:13px;color:var(--muted)}
+.lvs{display:flex;gap:4px}
+.lv{font-family:var(--mono);font-size:13px;width:40px;height:34px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.lv[aria-pressed="true"]{background:var(--c);border-color:var(--c);color:var(--surface);font-weight:500}
+.lv:hover{border-color:var(--c);color:var(--c)}
+.lv[aria-pressed="true"]:hover{color:var(--surface)}
+.note{grid-column:1/-1;display:none}
+.case.open .note{display:block}
+.note input{width:100%;font-size:13px}
+.tools{grid-column:1/-1;display:flex;gap:12px}
+.link{background:none;border:0;padding:0;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline}
+.add{margin-top:30px;background:var(--surface);border:1px dashed var(--line);border-radius:8px;padding:14px;display:flex;flex-wrap:wrap;gap:8px}
+.add input{flex:1 1 260px;min-width:0}
+.out{margin-top:30px;display:none}
+.out.show{display:block}
+.out textarea{width:100%;min-height:260px;font-family:var(--mono);font-size:12px}
+.empty{color:var(--muted);padding:20px 0}
+.sync{font-family:var(--mono);font-size:12px;color:var(--muted);margin:8px 0 0}
+.sync.ok{color:var(--n1)}
+.sync.err{color:var(--n4)}
+.send{margin-top:30px;background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--wine);border-radius:8px;padding:16px}
+.send h2{font-family:var(--display);font-size:22px;margin:0 0 4px}
+.send .lede{margin:0 0 12px}
+.send .row{display:flex;flex-wrap:wrap;gap:8px}
+.send input{flex:1 1 260px;min-width:0}
+.btn:disabled{opacity:.55;cursor:default}
+@media (max-width:560px){.case{grid-template-columns:1fr}.lv{flex:1;width:auto}.lvs{width:100%}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Clasificador de la Matriz de Decisiones</h1>
+  <p class="lede">Una decisión a tiempo con la información suficiente vale más que una decisión perfecta que llega tarde. Asigna a cada situación el nivel de decisión del gerente de sucursal. Toca "Agregar condición o nota" para dejar una condición o excepción (por ejemplo, "nivel 2 si es menor a $1,500"). Puedes agregar casos propios al final. Cuando termines, envía tus respuestas desde el final de la página.</p>
+
+  <div class="legend">
+    <div class="lg" style="--c:var(--n1)"><b>1 · Decide sola</b>
+      <span class="def">Decisiones del día a día que forman parte de operar la sucursal.</span>
+      <dl>
+        <dt>Cuándo aplica</dt><dd>Dentro de política, presupuesto y estándar. Se puede corregir el mismo turno si sale mal. No cambia nada para otras áreas.</dd>
+        <dt>A quién</dt><dd>A nadie. Queda en bitácora si aplica.</dd>
+        <dt>Tiempo</dt><dd>En el momento.</dd>
+      </dl></div>
+    <div class="lg" style="--c:var(--n2)"><b>2 · Decide y avisa</b>
+      <span class="def">Tienes autoridad para decidir, pero alguien más necesita saberlo para dar seguimiento.</span>
+      <dl>
+        <dt>Cuándo aplica</dt><dd>Hay un costo menor dentro de límite, afecta nómina o asistencia, o deja algo por escrito con un colaborador.</dd>
+        <dt>A quién</dt><dd>Al área dueña del tema: Operaciones, RH, Chef Ejecutivo o Administración.</dd>
+        <dt>Tiempo</dt><dd>El mismo día, por escrito: qué pasó, qué decidiste y por qué.</dd>
+      </dl></div>
+    <div class="lg" style="--c:var(--n3)"><b>3 · Consulta antes</b>
+      <span class="def">La decisión no es solo tuya: necesita visto bueno antes de ejecutarse.</span>
+      <dl>
+        <dt>Cuándo aplica</dt><dd>Sale de presupuesto o política, cambia un estándar, receta o proceso, o involucra movimientos de personal (altas, bajas, promociones).</dd>
+        <dt>A quién</dt><dd>Al área que autoriza: Operaciones, RH, Chef Ejecutivo, Administración.</dd>
+        <dt>Tiempo</dt><dd>Antes de actuar. Llegas con tu propuesta: problema, opciones, recomendación y costo.</dd>
+      </dl></div>
+    <div class="lg" style="--c:var(--n4)"><b>4 · Escala de inmediato</b>
+      <span class="def">Hay riesgo para personas, para la marca o para la operación. Primero contienes, luego llamas.</span>
+      <dl>
+        <dt>Cuándo aplica</dt><dd>Accidentes, faltas graves, temas legales o con autoridades, o fallas que impiden operar.</dd>
+        <dt>A quién, según el caso</dt><dd><ul>
+          <li><b style="display:inline;color:inherit;font-size:inherit">Operaciones:</b> fallas que impiden operar, robos, autoridades, crisis con clientes.</li>
+          <li><b style="display:inline;color:inherit;font-size:inherit">RH:</b> accidente de colaborador, agresión, acoso, abandono, estado inconveniente.</li>
+          <li><b style="display:inline;color:inherit;font-size:inherit">Chef Ejecutivo:</b> intoxicación, producto contaminado, plaga, pérdida de producto por falla de equipo.</li>
+        </ul></dd>
+        <dt>Tiempo</dt><dd>En ese momento, por llamada. El mensaje escrito va después.</dd>
+      </dl></div>
+  </div>
+
+  <div class="bar">
+    <div class="prog">
+      <div class="t" id="progT"></div>
+      <div class="track" id="track"></div>
+    </div>
+    <input type="search" id="q" placeholder="Buscar caso…" aria-label="Buscar caso">
+    <select id="fArea" aria-label="Filtrar área"></select>
+    <select id="fEstado" aria-label="Filtrar estado">
+      <option value="all">Todos</option><option value="pend">Sin clasificar</option>
+      <option value="1">Nivel 1</option><option value="2">Nivel 2</option><option value="3">Nivel 3</option><option value="4">Nivel 4</option>
+    </select>
+    <button class="btn ghost" id="exp">Ver resumen</button>
+    <button class="btn" id="pdf" hidden>Descargar PDF</button>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="add">
+    <select id="newArea" aria-label="Área del nuevo caso"></select>
+    <input type="text" id="newCase" placeholder="Escribe un caso que no esté en la lista…">
+    <button class="btn" id="addBtn">Agregar caso</button>
+  </div>
+
+  <section class="send" aria-labelledby="sendH">
+    <h2 id="sendH">Enviar mis respuestas</h2>
+    <p class="lede">Escribe tu nombre y envía. Tus respuestas se guardan en este navegador mientras trabajas; si después cambias algo, vuelve a enviar y se reemplaza tu envío anterior.</p>
+    <div class="row">
+      <input type="text" id="nombre" placeholder="Tu nombre completo" aria-label="Tu nombre completo" autocomplete="name">
+      <button class="btn" id="sendBtn">Enviar respuestas</button>
+    </div>
+    <p class="sync" id="sendMsg" role="status" aria-live="polite"></p>
+  </section>
+
+  <div class="out" id="out">
+    <h2 style="font-family:var(--display)">Resumen por nivel</h2>
+    <p class="lede">Copia este texto para pasarlo a la matriz final o al descriptivo de puesto.</p>
+    <textarea id="outTxt" readonly aria-label="Resumen"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn" id="copy">Copiar resumen</button>
+      <button class="btn ghost" id="reset">Borrar clasificación</button>
+      <span id="msg" style="color:var(--muted);font-size:13px;align-self:center"></span>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="config.js"></script>
+<script>
+const DATA = {
+"Personal y turno":[
+["Reasignar estaciones durante el turno"],
+["Cubrir una falta moviendo a alguien de puesto"],
+["Pedir a un colaborador que se quede tiempo extra","Genera pago de horas extra"],
+["Llamar a un colaborador en su descanso para cubrir"],
+["Mandar a casa a alguien por enfermedad o mal estado"],
+["Mandar a casa a alguien por bajo volumen de venta"],
+["Operar por debajo del show ideal un día"],
+["Pedir apoyo de personal a otra sucursal"],
+["Prestar personal a otra sucursal"],
+["Corregir verbalmente a un colaborador"],
+["Reconocer públicamente a un colaborador"],
+["Levantar acta administrativa"],
+["Suspender a un colaborador"],
+["Colaborador llega en estado inconveniente (alcohol, sustancias)"],
+["Conflicto o discusión entre colaboradores en turno"],
+["Agresión física entre colaboradores"],
+["Acoso o queja de hostigamiento de un colaborador"],
+["Colaborador abandona el turno sin avisar"],
+["Dar de baja a un colaborador"],
+["Contratar o dar de alta a alguien"],
+["Promover o cambiar de puesto a un colaborador"],
+["Solicitar una vacante nueva o reemplazo"],
+["Decidir quién da capacitación a un nuevo ingreso"],
+["Autorizar un adelanto de sueldo o préstamo"]],
+"Horarios, descansos y asistencia":[
+["Armar el rol semanal dentro del show ideal"],
+["Cambiar un horario ya publicado"],
+["Intercambio de descanso entre dos colaboradores"],
+["Autorizar un permiso con goce de sueldo"],
+["Autorizar un permiso sin goce de sueldo"],
+["Aprobar vacaciones"],
+["Justificar un retardo o una falta"],
+["Cambiar el horario de apertura o cierre de la sucursal"],
+["Cerrar la sucursal antes de la hora"]],
+"Clientes y servicio":[
+["Resolver una queja dentro de la política"],
+["Cortesía de un postre o bebida por error del servicio"],
+["Cortesía o descuento fuera de política"],
+["Reponer un platillo con error"],
+["Cliente exige reembolso de su cuenta"],
+["Cliente se va sin pagar (simpa)"],
+["Cliente agresivo o en estado inconveniente"],
+["Pedir a un cliente que se retire"],
+["Queja en redes sociales o reseña negativa pública"],
+["Cliente reporta malestar o intoxicación"],
+["Cliente sufre un accidente dentro de la sucursal"],
+["Reservación o evento de grupo grande"],
+["Aceptar una cotización para evento privado"],
+["Cliente reporta objeto olvidado o perdido"]],
+"Cocina, barra y producto":[
+["Sacar un platillo o bebida del menú del día por falta de insumo (86)"],
+["Sustituir un insumo por otro similar"],
+["Modificar la receta o el gramaje estándar"],
+["Tirar producto en mal estado (merma)"],
+["Merma grande o fuera de lo normal"],
+["Preparar producción extra por venta alta esperada"],
+["Ajustar el set up de barra o estaciones"],
+["Crear una bebida o platillo especial del día"],
+["Producto de CEDIS llega en mal estado o incompleto"],
+["Rechazar una entrega de CEDIS o proveedor"]],
+"Inventario y compras":[
+["Hacer el pedido regular a CEDIS"],
+["Pedido extraordinario a CEDIS"],
+["Compra urgente de insumo con caja chica"],
+["Compra urgente fuera de presupuesto"],
+["Comprar con un proveedor no autorizado"],
+["Diferencia en inventario dentro de tolerancia"],
+["Diferencia en inventario fuera de tolerancia"],
+["Faltante de producto que sugiere robo"],
+["Traspaso de insumos entre sucursales"]],
+"Caja y dinero":[
+["Faltante o sobrante menor en corte de caja"],
+["Faltante de caja relevante"],
+["Cancelar un ticket en POS"],
+["Aplicar un descuento manual en POS"],
+["Error de cobro con tarjeta o terminal"],
+["Billete falso recibido"],
+["Pago de un gasto con caja chica"],
+["Depósito o retiro de efectivo fuera del horario habitual"],
+["Asalto o robo a la sucursal"]],
+"Mantenimiento y equipo":[
+["Reparación urgente menor (fuga, foco, chapa)"],
+["Reparación mayor o con costo alto"],
+["Falla de refrigerador o congelador con producto dentro"],
+["Falla de cafetera o equipo clave de barra"],
+["Falla de gas, luz o agua que impide operar"],
+["Llamar a un técnico externo"],
+["Mover o cambiar el acomodo de mobiliario"],
+["Comprar utensilios o equipo menor"]],
+"Seguridad, higiene y autoridades":[
+["Accidente de un colaborador (corte, quemadura, caída)"],
+["Conato de incendio"],
+["Plaga detectada en la sucursal"],
+["Visita de Protección Civil, COFEPRIS o verificador"],
+["Visita de inspección laboral o del IMSS"],
+["Clausura o amenaza de clausura"],
+["Emergencia médica de un cliente"],
+["Sismo o evacuación"]],
+"Sistemas, POS y comunicación":[
+["Falla de POS que impide cobrar"],
+["Falla de impresora de comandas"],
+["Falla de internet"],
+["Cambiar precios o modificadores en POS"],
+["Publicar algo en redes de la sucursal"],
+["Atender a un medio de comunicación o influencer"],
+["Aceptar una colaboración o patrocinio local"]]
+};
+
+const AREAS = Object.keys(DATA);
+const KEY = "trg-matriz-clasif-v1", RID_KEY = "trg-matriz-rid", SENT_KEY = "trg-matriz-enviado";
+const ENDPOINT = (window.CLASIFICADOR_ENDPOINT || "").trim();
+const norm = s=>({lv:Object.assign({},s&&s.lv), note:Object.assign({},s&&s.note), custom:Array.isArray(s&&s.custom)?s.custom.map(c=>({a:c.a,t:c.t})):[], nombre:String((s&&s.nombre)||"")});
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+};
+let state = norm(null);
+try{ const s = JSON.parse(store.get(KEY)); if(s) state = norm(s); }catch(e){}
+/* Identificador anónimo de este navegador: al reenviar, la hoja reemplaza la respuesta anterior en vez de duplicarla */
+let RID = store.get(RID_KEY);
+if(!RID){
+  RID = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "r-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,12);
+  store.set(RID_KEY, RID);
+}
+let sent = null;
+try{ sent = JSON.parse(store.get(SENT_KEY)); }catch(e){}
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const snapshot = ()=>JSON.stringify({lv:state.lv,note:state.note,custom:state.custom,nombre:state.nombre.trim()});
+const save = ()=>{ store.set(KEY, JSON.stringify(state)); sendStatus(); };
+
+const LBL = {1:"Decide sola",2:"Decide y avisa",3:"Consulta antes",4:"Escala de inmediato"};
+const WHO_DEF = {1:"Decides en el momento. No avisas a nadie.",2:"Decides y avisas el mismo día, por escrito, al área dueña del tema (Operaciones, RH, Chef Ejecutivo o Administración).",3:"Antes de actuar, consultas al área que autoriza con tu propuesta: problema, opciones, recomendación y costo.",4:"Contienes la situación y llamas en ese momento a Operaciones, RH o Chef Ejecutivo según el caso."};
+const PDFC = {1:[126,142,63],2:[176,145,42],3:[184,98,47],4:[138,58,79]};
+
+function allCases(st=state){
+  const out=[];
+  AREAS.forEach(a=>DATA[a].forEach((c,i)=>out.push({id:a+"|"+i,area:a,q:c[0],ctx:c[1]||""})));
+  st.custom.forEach(c=>out.push({id:"c|"+c.t,area:c.a,q:c.t,ctx:"Caso agregado",custom:true}));
+  return out;
+}
+
+function buildPDF(st){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"pt",format:"letter"});
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 48, CW = W-2*M;
+  let y = M;
+  const wine=[83,45,59], ink=[58,31,41], muted=[122,92,102];
+  const need = h=>{ if(y+h > H-M){ doc.addPage(); y=M; } };
+  const text = (t,size,color,style,indent=0,gap=4)=>{
+    doc.setFont("helvetica",style||"normal"); doc.setFontSize(size); doc.setTextColor(...color);
+    const lines = doc.splitTextToSize(t, CW-indent);
+    lines.forEach(l=>{ need(size+gap); doc.text(l, M+indent, y+size); y += size+gap; });
+  };
+  doc.setFillColor(...wine); doc.rect(0,0,W,70,"F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(20); doc.setTextColor(250,238,230);
+  doc.text("MATRIZ DE DECISIONES", M, 40);
+  doc.setFont("helvetica","normal"); doc.setFontSize(10);
+  doc.text(["Gerente de sucursal", st.nombre.trim(), "Tagers Restaurant Group"].filter(Boolean).join(" · "), M, 56);
+  y = 86;
+  const cases = allCases(st);
+  [1,2,3,4].forEach(k=>{
+    need(70);
+    y += 10;
+    doc.setFillColor(...PDFC[k]); doc.rect(M, y, CW, 22, "F");
+    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(255,255,255);
+    const n = cases.filter(c=>st.lv[c.id]==k).length;
+    doc.text(`${k} · ${LBL[k].toUpperCase()}`, M+8, y+15);
+    doc.setFont("helvetica","normal"); doc.setFontSize(10);
+    doc.text(`${n} casos`, W-M-8, y+15, {align:"right"});
+    y += 28;
+    text(WHO_DEF[k], 9.5, muted, "italic");
+    y += 2;
+    if(!n){ text("Sin casos asignados.", 10, muted); return; }
+    AREAS.forEach(a=>{
+      const r = cases.filter(c=>c.area===a && st.lv[c.id]==k);
+      if(!r.length) return;
+      need(30); y += 4;
+      text(a, 10.5, PDFC[k], "bold");
+      r.forEach(c=>{
+        text("•  "+c.q, 10, ink, "normal", 8, 3);
+        if(st.note[c.id]) text("Condición: "+st.note[c.id], 9, muted, "italic", 20, 3);
+      });
+    });
+  });
+  const p = cases.filter(c=>!st.lv[c.id]);
+  if(p.length){
+    need(60); y += 14;
+    text(`SIN CLASIFICAR (${p.length})`, 11, muted, "bold");
+    p.forEach(c=>text("•  "+c.q, 9.5, muted, "normal", 8, 3));
+  }
+  const pages = doc.getNumberOfPages();
+  for(let i=1;i<=pages;i++){ doc.setPage(i); doc.setFontSize(8); doc.setTextColor(...muted); doc.text(`${i} / ${pages}`, W-M, H-24, {align:"right"}); }
+  return doc;
+}
+function slug(s){ return (s||"respuesta").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-zA-Z0-9]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"respuesta"; }
+if(window.jspdf) $("#pdf").hidden = false;
+$("#pdf").addEventListener("click", e=>{
+  const b = e.currentTarget, old = b.textContent;
+  try{ buildPDF(state).save("matriz-de-decisiones"+(state.nombre.trim()?"-"+slug(state.nombre):"")+".pdf"); }
+  catch(err){ b.textContent = "No se pudo generar"; setTimeout(()=>{ b.textContent=old; }, 2500); }
+});
+
+const fArea=$("#fArea"), newArea=$("#newArea");
+fArea.innerHTML='<option value="all">Todas las áreas</option>'+AREAS.map(a=>`<option>${a}</option>`).join("");
+newArea.innerHTML=AREAS.map(a=>`<option>${a}</option>`).join("");
+
+function render(){
+  const q=$("#q").value.trim().toLowerCase(), fa=fArea.value, fe=$("#fEstado").value;
+  const cases=allCases();
+  let html="";
+  AREAS.forEach(a=>{
+    if(fa!=="all" && fa!==a) return;
+    const inA=cases.filter(c=>c.area===a);
+    const vis=inA.filter(c=>{
+      const l=state.lv[c.id];
+      if(q && !c.q.toLowerCase().includes(q)) return false;
+      if(fe==="pend" && l) return false;
+      if(/^[1-4]$/.test(fe) && String(l)!==fe) return false;
+      return true;
+    });
+    if(!vis.length) return;
+    const done=inA.filter(c=>state.lv[c.id]).length;
+    html+=`<section class="area"><h2>${a}<small>${done}/${inA.length}</small></h2>`;
+    vis.forEach(c=>{
+      const l=state.lv[c.id], n=state.note[c.id]||"";
+      html+=`<div class="case${n?" open":""}" data-id="${esc(c.id)}" style="${l?`--cl:var(--n${l})`:""}">
+        <div class="txt"><div class="q">${esc(c.q)}</div>${c.ctx?`<div class="ctx">${esc(c.ctx)}</div>`:""}</div>
+        <div class="lvs" role="group" aria-label="Nivel">${[1,2,3,4].map(k=>`<button class="lv" style="--c:var(--n${k})" data-l="${k}" aria-pressed="${l==k}" title="${LBL[k]}">${k}</button>`).join("")}</div>
+        <div class="tools"><button class="link" data-act="note">${n?"Nota":"Agregar condición o nota"}</button>${c.custom?'<button class="link" data-act="del">Quitar caso</button>':""}</div>
+        <div class="note"><input type="text" value="${esc(n)}" placeholder="Ej. nivel 2 si es menor a $1,500; si es mayor, nivel 3" aria-label="Nota"></div>
+      </div>`;
+    });
+    html+="</section>";
+  });
+  $("#list").innerHTML = html || '<p class="empty">No hay casos con estos filtros.</p>';
+  progress(cases);
+}
+function progress(cases){
+  const t=cases.length, cnt={1:0,2:0,3:0,4:0};
+  cases.forEach(c=>{const l=state.lv[c.id]; if(l) cnt[l]++;});
+  const d=cnt[1]+cnt[2]+cnt[3]+cnt[4];
+  $("#progT").innerHTML=`<span>${d} de ${t} clasificados</span>`+[1,2,3,4].map(k=>`<i style="--c:var(--n${k})">N${k}: ${cnt[k]}</i>`).join("");
+  $("#track").innerHTML=[1,2,3,4].map(k=>`<div style="width:${t?cnt[k]/t*100:0}%;background:var(--n${k})"></div>`).join("");
+}
+$("#list").addEventListener("click",e=>{
+  const card=e.target.closest(".case"); if(!card) return;
+  const id=card.dataset.id;
+  const b=e.target.closest(".lv");
+  if(b){ const l=+b.dataset.l; state.lv[id]= state.lv[id]===l?undefined:l; if(!state.lv[id]) delete state.lv[id]; save(); render(); return; }
+  const a=e.target.dataset.act;
+  if(a==="note"){ card.classList.toggle("open"); const i=card.querySelector(".note input"); if(card.classList.contains("open")) i.focus(); }
+  if(a==="del"){ const t=id.slice(2); state.custom=state.custom.filter(c=>c.t!==t); delete state.lv[id]; delete state.note[id]; save(); render(); }
+});
+$("#list").addEventListener("input",e=>{
+  if(!e.target.matches(".note input")) return;
+  const id=e.target.closest(".case").dataset.id, v=e.target.value.trim();
+  if(v) state.note[id]=v; else delete state.note[id]; save();
+});
+["#q","#fArea","#fEstado"].forEach(s=>$(s).addEventListener("input",render));
+$("#addBtn").addEventListener("click",()=>{
+  const t=$("#newCase").value.trim(); if(!t) return;
+  if(!state.custom.some(c=>c.t===t)) state.custom.push({a:newArea.value,t});
+  $("#newCase").value=""; save(); fArea.value="all"; $("#fEstado").value="all"; render();
+});
+$("#newCase").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#addBtn").click(); });
+
+function summaryText(st){
+  const cases=allCases(st);
+  let txt="MATRIZ DE DECISIONES · GERENTE DE SUCURSAL TRG\n";
+  if(st.nombre.trim()) txt+=st.nombre.trim()+"\n";
+  [1,2,3,4].forEach(k=>{
+    txt+=`\n${k} · ${LBL[k].toUpperCase()}\n`;
+    AREAS.forEach(a=>{
+      const r=cases.filter(c=>c.area===a && st.lv[c.id]==k);
+      if(!r.length) return;
+      txt+=`  ${a}\n`+r.map(c=>`   - ${c.q}${st.note[c.id]?` (${st.note[c.id]})`:""}`).join("\n")+"\n";
+    });
+  });
+  const p=cases.filter(c=>!st.lv[c.id]);
+  if(p.length) txt+=`\nSIN CLASIFICAR (${p.length})\n`+p.map(c=>`   - ${c.q}`).join("\n")+"\n";
+  return txt;
+}
+$("#exp").addEventListener("click",()=>{
+  $("#outTxt").value=summaryText(state); $("#out").classList.add("show"); $("#out").scrollIntoView({behavior:"smooth"});
+});
+$("#copy").addEventListener("click",()=>{
+  const ta=$("#outTxt");
+  navigator.clipboard.writeText(ta.value).then(()=>$("#msg").textContent="Copiado").catch(()=>{ta.select();$("#msg").textContent="Texto seleccionado, cópialo con Ctrl/Cmd + C";});
+});
+let armedReset=false;
+$("#reset").addEventListener("click",e=>{
+  if(!armedReset){ armedReset=true; e.target.textContent="Confirmar: borrar todo"; setTimeout(()=>{armedReset=false;e.target.textContent="Borrar clasificación";},4000); return; }
+  state.lv={}; state.note={}; save(); armedReset=false; e.target.textContent="Borrar clasificación"; $("#out").classList.remove("show"); render();
+});
+
+/* Envío: la respuesta va a la aplicación web de Google Apps Script, que la escribe en la hoja de cálculo */
+const nombre=$("#nombre"), sendBtn=$("#sendBtn");
+nombre.value = state.nombre;
+nombre.addEventListener("input",()=>{ state.nombre=nombre.value; save(); });
+function setSend(t, cls){ const el=$("#sendMsg"); el.textContent=t; el.className="sync"+(cls?" "+cls:""); }
+const fmt = iso=>{ try{ return new Date(iso).toLocaleString("es-MX",{dateStyle:"medium",timeStyle:"short"}); }catch(e){ return ""; } };
+function sendStatus(){
+  if(!ENDPOINT){ sendBtn.disabled=true; setSend("El envío todavía no está configurado. Mientras tanto, descarga tu PDF y mándalo por otro medio.","err"); return; }
+  if(sending) return;
+  if(sent && sent.snap===snapshot()) setSend("✓ Enviado ("+fmt(sent.at)+"). Si cambias algo, vuelve a enviar y se reemplaza.","ok");
+  else if(sent) setSend("Tienes cambios sin enviar. Último envío: "+fmt(sent.at));
+  else setSend("");
+}
+let sending=false, armedSend=false;
+sendBtn.addEventListener("click", async ()=>{
+  const n = state.nombre.trim();
+  if(!n){ setSend("Escribe tu nombre antes de enviar.","err"); nombre.focus(); return; }
+  const cases = allCases(), pend = cases.filter(c=>!state.lv[c.id]).length;
+  if(pend && !armedSend){
+    armedSend=true; sendBtn.textContent="Faltan "+pend+". Enviar de todos modos";
+    setTimeout(()=>{ armedSend=false; sendBtn.textContent="Enviar respuestas"; },5000);
+    return;
+  }
+  armedSend=false; sending=true; sendBtn.disabled=true; sendBtn.textContent="Enviando…"; setSend("");
+  const snap = snapshot();
+  const body = JSON.stringify({
+    id: RID, nombre: n, resumen: summaryText(state),
+    casos: cases.map(c=>({area:c.area, caso:c.q, nivel:state.lv[c.id]||0, nota:state.note[c.id]||"", agregado:!!c.custom}))
+  });
+  let ok=false, err="";
+  try{
+    const r = await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body});
+    const j = await r.json();
+    ok = !!(j && j.ok); if(!ok) err = (j && j.error) || "";
+  }catch(e){
+    // Si el navegador no deja leer la respuesta, se envía sin leerla; reenviar no duplica porque la hoja reemplaza por id
+    try{ await fetch(ENDPOINT,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body}); ok=true; }catch(e2){}
+  }
+  sending=false; sendBtn.disabled=false; sendBtn.textContent="Enviar respuestas";
+  if(ok){ sent={at:new Date().toISOString(), snap}; store.set(SENT_KEY, JSON.stringify(sent)); sendStatus(); }
+  else setSend("No se pudo enviar"+(err?" ("+err+")":"")+". Revisa tu conexión e inténtalo de nuevo.","err");
+});
+render();
+sendStatus();
+</script>
+</body>
+</html>
